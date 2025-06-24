@@ -291,24 +291,57 @@
                 tmt_total_trials: sequence.length
             };
             
-            // Send data to parent Qualtrics window
+            console.log('TMT Data to send:', embeddedData);
+            
+            // Method 1: Try Qualtrics API directly
             try {
-                parent.postMessage({
-                    type: 'TMT_COMPLETE',
-                    data: embeddedData
-                }, '*');
-                
-                // Also try Qualtrics-specific method
-                if (parent.Qualtrics) {
+                if (parent && parent.Qualtrics && parent.Qualtrics.SurveyEngine) {
+                    console.log('Using Qualtrics API method');
                     Object.keys(embeddedData).forEach(key => {
                         parent.Qualtrics.SurveyEngine.setEmbeddedData(key, embeddedData[key]);
+                        console.log(`Set ${key}: ${embeddedData[key]}`);
                     });
                 }
             } catch (error) {
-                console.log('Error sending data to parent:', error);
+                console.log('Qualtrics API method failed:', error);
             }
             
-            // Show completion message
+            // Method 2: PostMessage to parent
+            try {
+                parent.postMessage({
+                    type: 'QUALTRICS_SET_EMBEDDED_DATA',
+                    data: embeddedData
+                }, '*');
+                console.log('PostMessage sent');
+            } catch (error) {
+                console.log('PostMessage failed:', error);
+            }
+            
+            // Method 3: Try to access parent window directly
+            try {
+                if (parent && parent.window && parent.window.QSI) {
+                    console.log('Trying QSI method');
+                    Object.keys(embeddedData).forEach(key => {
+                        parent.window.QSI.API.setEmbeddedData(key, embeddedData[key]);
+                    });
+                }
+            } catch (error) {
+                console.log('QSI method failed:', error);
+            }
+            
+            // Method 4: Try global Qualtrics object
+            try {
+                if (window.parent && window.parent.Q) {
+                    console.log('Trying parent Q method');
+                    Object.keys(embeddedData).forEach(key => {
+                        window.parent.Q.setEmbeddedData(key, embeddedData[key]);
+                    });
+                }
+            } catch (error) {
+                console.log('Parent Q method failed:', error);
+            }
+            
+            // Show completion message with debug info
             document.getElementById('game-container').style.display = 'none';
             document.getElementById('redirect-message').style.display = 'block';
             document.getElementById('redirect-message').innerHTML = `
@@ -316,7 +349,11 @@
                 <p><strong>Time:</strong> ${totalTime} seconds</p>
                 <p><strong>Errors:</strong> ${errors}</p>
                 <p><strong>Accuracy:</strong> ${accuracy.toFixed(1)}%</p>
-                <p>Data has been saved. You may now continue with the survey.</p>
+                <p style="font-size: 12px; color: #666;">Check browser console (F12) for debugging info</p>
+                <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; font-size: 12px;">
+                    <strong>Debug Data:</strong><br>
+                    ${Object.entries(embeddedData).map(([key, value]) => `${key}: ${value}`).join('<br>')}
+                </div>
                 <button onclick="location.reload()" style="margin-top: 20px;">Restart Test</button>
             `;
         }
