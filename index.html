@@ -384,33 +384,77 @@
             document.getElementById('completion-message').style.display = 'block';
         }
 
-        /*************** EMBEDDED DATA METHOD (Same as WCST) ***************/
+        /*************** EMBEDDED DATA METHOD - Multiple Approaches ***************/
         function sendDataToQualtrics(totalTime, avgRT, accuracy, correctTrials) {
             try {
-                console.log("Sending TMT data to Qualtrics via embedded fields");
+                const tmtData = {
+                    tmt_subject_id: subjectId,
+                    tmt_test_type: "B",
+                    tmt_total_time: totalTime,
+                    tmt_avg_rt: avgRT,
+                    tmt_error_count: errors,
+                    tmt_accuracy: parseFloat(accuracy.toFixed(2)),
+                    tmt_completed_trials: correctTrials,
+                    tmt_total_trials: sequence.length
+                };
 
+                console.log("=== TMT DATA DEBUGGING ===");
+                console.log("Data to send:", tmtData);
+                console.log("Window parent:", window.parent);
+                console.log("Self vs parent:", window.self === window.parent);
+
+                // Method 1: Direct Qualtrics API (if available)
                 if (typeof Qualtrics !== 'undefined' && Qualtrics.SurveyEngine) {
-                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_subject_id", subjectId);
-                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_test_type", "B");
-                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_total_time", totalTime);
-                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_avg_rt", avgRT);
-                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_error_count", errors);
-                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_accuracy", accuracy.toFixed(2));
-                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_completed_trials", correctTrials);
-                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_total_trials", sequence.length);
-
-                    console.log("TMT embedded data set successfully");
-
-                    // Call the completion function and auto-advance
-                    setTimeout(() => {
-                        if (typeof window.onTMTComplete === 'function') {
-                            window.onTMTComplete();
-                        }
-                    }, 300);
-                } else {
-                    console.log('Not running in Qualtrics - data saved locally');
-                    alert('Experiment completed! Data has been saved locally.');
+                    console.log("Method 1: Direct Qualtrics API");
+                    Object.keys(tmtData).forEach(key => {
+                        Qualtrics.SurveyEngine.setEmbeddedData(key, tmtData[key]);
+                        console.log(`Set ${key}: ${tmtData[key]}`);
+                    });
                 }
+
+                // Method 2: PostMessage to parent window
+                console.log("Method 2: PostMessage");
+                try {
+                    window.parent.postMessage({
+                        type: 'SET_QUALTRICS_EMBEDDED_DATA',
+                        data: tmtData
+                    }, '*');
+                    console.log("PostMessage sent to parent");
+                } catch (e) {
+                    console.log("PostMessage failed:", e);
+                }
+
+                // Method 3: Try to access parent Qualtrics
+                try {
+                    if (window.parent && window.parent.Qualtrics && window.parent.Qualtrics.SurveyEngine) {
+                        console.log("Method 3: Parent Qualtrics API");
+                        Object.keys(tmtData).forEach(key => {
+                            window.parent.Qualtrics.SurveyEngine.setEmbeddedData(key, tmtData[key]);
+                            console.log(`Parent set ${key}: ${tmtData[key]}`);
+                        });
+                    }
+                } catch (e) {
+                    console.log("Parent Qualtrics access failed:", e);
+                }
+
+                // Method 4: Store in window for Qualtrics to pick up
+                try {
+                    window.tmtResults = tmtData;
+                    window.parent.tmtResults = tmtData;
+                    console.log("Method 4: Stored in window objects");
+                } catch (e) {
+                    console.log("Window storage failed:", e);
+                }
+
+                console.log("=== ALL METHODS ATTEMPTED ===");
+
+                // Auto-advance
+                setTimeout(() => {
+                    if (typeof window.onTMTComplete === 'function') {
+                        window.onTMTComplete();
+                    }
+                }, 500);
+
             } catch (error) {
                 console.error("Qualtrics data transfer error:", error);
             }
