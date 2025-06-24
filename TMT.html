@@ -117,8 +117,7 @@
 
         <div id="redirect-message">
             <h2>Test Complete!</h2>
-            <p>Redirecting to survey...</p>
-            <p>If you are not redirected automatically, <a href="#" id="manual-link">click here</a>.</p>
+            <p>Results saved to survey data.</p>
         </div>
     </div>
 
@@ -281,29 +280,45 @@
             const avgRT = totalTime / currentIndex;
             const accuracy = ((currentIndex - errors) / currentIndex * 100);
             
-            // Create embedded data for Qualtrics
-            const params = new URLSearchParams({
+            // Create embedded data object for Qualtrics
+            const embeddedData = {
                 tmt_test_type: 'B',
                 tmt_total_time: totalTime,
-                tmt_avg_rt: avgRT.toFixed(2),
+                tmt_avg_rt: parseFloat(avgRT.toFixed(2)),
                 tmt_error_count: errors,
-                tmt_accuracy: accuracy.toFixed(1),
+                tmt_accuracy: parseFloat(accuracy.toFixed(1)),
                 tmt_completed_trials: currentIndex,
                 tmt_total_trials: sequence.length
-            });
+            };
             
-            // Your Qualtrics survey URL with embedded data
-            const qualtricsURL = 'https://oregon.qualtrics.com/jfe/form/SV_3pAnL2TwkoIaofk?' + params.toString();
+            // Send data to parent Qualtrics window
+            try {
+                parent.postMessage({
+                    type: 'TMT_COMPLETE',
+                    data: embeddedData
+                }, '*');
+                
+                // Also try Qualtrics-specific method
+                if (parent.Qualtrics) {
+                    Object.keys(embeddedData).forEach(key => {
+                        parent.Qualtrics.SurveyEngine.setEmbeddedData(key, embeddedData[key]);
+                    });
+                }
+            } catch (error) {
+                console.log('Error sending data to parent:', error);
+            }
             
-            // Show redirect message
+            // Show completion message
             document.getElementById('game-container').style.display = 'none';
             document.getElementById('redirect-message').style.display = 'block';
-            document.getElementById('manual-link').href = qualtricsURL;
-            
-            // Redirect after 2 seconds
-            setTimeout(() => {
-                window.location.href = qualtricsURL;
-            }, 2000);
+            document.getElementById('redirect-message').innerHTML = `
+                <h2>TMT-B Complete!</h2>
+                <p><strong>Time:</strong> ${totalTime} seconds</p>
+                <p><strong>Errors:</strong> ${errors}</p>
+                <p><strong>Accuracy:</strong> ${accuracy.toFixed(1)}%</p>
+                <p>Data has been saved. You may now continue with the survey.</p>
+                <button onclick="location.reload()" style="margin-top: 20px;">Restart Test</button>
+            `;
         }
     </script>
 </body>
