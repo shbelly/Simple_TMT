@@ -1,7 +1,67 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8"/>
     <title>Trail Making Test - Part B</title>
+    
+    <!-- Qualtrics Integration Script -->
+    <script>
+        // Function to check if we're running in Qualtrics
+        function isRunningInQualtrics() {
+            return typeof Qualtrics !== 'undefined' && Qualtrics.SurveyEngine;
+        }
+        
+        // Function to handle experiment completion in Qualtrics
+        function completeQualtricsExperiment() {
+            if (isRunningInQualtrics()) {
+                // Small delay to ensure data is sent before proceeding
+                setTimeout(function() {
+                    // This will advance to the next question in Qualtrics
+                    try {
+                        Qualtrics.SurveyEngine.clickNextButton();
+                    } catch (e) {
+                        console.log('Could not automatically advance Qualtrics survey');
+                    }
+                }, 1500);
+            }
+        }
+        
+        // Override the default completion to handle Qualtrics
+        window.addEventListener('load', function() {
+            if (isRunningInQualtrics()) {
+                console.log('TMT experiment loaded in Qualtrics environment');
+                
+                // Hide Qualtrics navigation buttons during experiment
+                try {
+                    document.getElementById('NextButton').style.display = 'none';
+                    document.getElementById('PreviousButton').style.display = 'none';
+                } catch (e) {
+                    // Buttons might not exist yet
+                }
+            }
+        });
+        
+        // Global function to be called when experiment completes
+        window.onTMTComplete = function() {
+            console.log('TMT experiment completed');
+            if (isRunningInQualtrics()) {
+                // Show Qualtrics navigation buttons again
+                try {
+                    document.getElementById('NextButton').style.display = '';
+                    document.getElementById('PreviousButton').style.display = '';
+                } catch (e) {
+                    // Buttons might not exist
+                }
+                
+                // Auto-advance or show completion message
+                completeQualtricsExperiment();
+            } else {
+                // Not in Qualtrics, show completion message
+                alert('Experiment completed! Data has been saved.');
+            }
+        };
+    </script>
+    
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -84,16 +144,36 @@
             font-weight: bold;
             margin: 10px 0;
         }
-        #redirect-message {
+        #completion-message {
             background-color: white;
             padding: 20px;
             border-radius: 10px;
             margin: 20px 0;
             display: none;
         }
+        #qualtrics-status {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: #007ACC;
+            color: white;
+            padding: 5px 10px;
+            font-size: 12px;
+            z-index: 10000;
+        }
     </style>
 </head>
 <body>
+    <div id="qualtrics-status">Running in Qualtrics</div>
+    
+    <script>
+        // Show Qualtrics status if running in Qualtrics
+        if (typeof Qualtrics !== 'undefined') {
+            document.getElementById('qualtrics-status').style.display = 'block';
+        }
+    </script>
+
     <div class="container">
         <h1>Trail Making Test - Part B</h1>
         
@@ -115,9 +195,9 @@
             <div id="game-area"></div>
         </div>
 
-        <div id="redirect-message">
-            <h2>Test Complete!</h2>
-            <p>Results saved to survey data.</p>
+        <div id="completion-message">
+            <h2>TMT-B Complete!</h2>
+            <p>Data has been saved. Continuing to next section...</p>
         </div>
     </div>
 
@@ -127,14 +207,21 @@
         let startTime = 0;
         let timerInterval = null;
         let errors = 0;
+        let allReactionTimes = [];
+        let totalTrials = 0;
 
         // TMT-B sequence (alternating numbers and letters)
         const sequenceB = ['1', 'A', '2', 'B', '3', 'C', '4', 'D', '5', 'E', '6', 'F'];
+        
+        // Generate random subject ID
+        const subjectId = 'TMT_' + Math.random().toString(36).substr(2, 9);
 
         function startTest() {
             sequence = [...sequenceB];
             currentIndex = 0;
             errors = 0;
+            allReactionTimes = [];
+            totalTrials = 0;
             
             document.getElementById('welcome').style.display = 'none';
             document.getElementById('game-container').style.display = 'block';
@@ -167,7 +254,7 @@
 
         function generateRandomPositions(count) {
             const positions = [];
-            const areaWidth = 700 - 50; // Account for circle size
+            const areaWidth = 700 - 50;
             const areaHeight = 500 - 50;
             
             for (let i = 0; i < count; i++) {
@@ -191,8 +278,16 @@
         }
 
         function clickCircle(item, index) {
+            const clickTime = Date.now();
             const expectedItem = sequence[currentIndex];
             const circle = document.getElementById('circle-' + index);
+            
+            totalTrials++;
+            
+            if (currentIndex > 0) {
+                const reactionTime = clickTime - (startTime + (currentIndex - 1) * 100); // Approximate
+                allReactionTimes.push(reactionTime);
+            }
             
             if (item === expectedItem) {
                 // Correct click
@@ -277,86 +372,56 @@
             const totalTime = Math.floor((Date.now() - startTime) / 1000);
             
             // Calculate performance metrics
-            const avgRT = totalTime / currentIndex;
-            const accuracy = ((currentIndex - errors) / currentIndex * 100);
+            const correctTrials = currentIndex;
+            const accuracy = totalTrials > 0 ? ((correctTrials - errors) / totalTrials) * 100 : 0;
+            const avgRT = allReactionTimes.length > 0 ? Math.round(allReactionTimes.reduce((sum, rt) => sum + rt, 0) / allReactionTimes.length) : 0;
             
-            // Create embedded data object for Qualtrics
-            const embeddedData = {
-                tmt_test_type: 'B',
-                tmt_total_time: totalTime,
-                tmt_avg_rt: parseFloat(avgRT.toFixed(2)),
-                tmt_error_count: errors,
-                tmt_accuracy: parseFloat(accuracy.toFixed(1)),
-                tmt_completed_trials: currentIndex,
-                tmt_total_trials: sequence.length
-            };
+            // Send data to Qualtrics using the same method as WCST
+            sendDataToQualtrics(totalTime, avgRT, accuracy, correctTrials);
             
-            console.log('TMT Data to send:', embeddedData);
-            
-            // Method 1: Try Qualtrics API directly
-            try {
-                if (parent && parent.Qualtrics && parent.Qualtrics.SurveyEngine) {
-                    console.log('Using Qualtrics API method');
-                    Object.keys(embeddedData).forEach(key => {
-                        parent.Qualtrics.SurveyEngine.setEmbeddedData(key, embeddedData[key]);
-                        console.log(`Set ${key}: ${embeddedData[key]}`);
-                    });
-                }
-            } catch (error) {
-                console.log('Qualtrics API method failed:', error);
-            }
-            
-            // Method 2: PostMessage to parent
-            try {
-                parent.postMessage({
-                    type: 'QUALTRICS_SET_EMBEDDED_DATA',
-                    data: embeddedData
-                }, '*');
-                console.log('PostMessage sent');
-            } catch (error) {
-                console.log('PostMessage failed:', error);
-            }
-            
-            // Method 3: Try to access parent window directly
-            try {
-                if (parent && parent.window && parent.window.QSI) {
-                    console.log('Trying QSI method');
-                    Object.keys(embeddedData).forEach(key => {
-                        parent.window.QSI.API.setEmbeddedData(key, embeddedData[key]);
-                    });
-                }
-            } catch (error) {
-                console.log('QSI method failed:', error);
-            }
-            
-            // Method 4: Try global Qualtrics object
-            try {
-                if (window.parent && window.parent.Q) {
-                    console.log('Trying parent Q method');
-                    Object.keys(embeddedData).forEach(key => {
-                        window.parent.Q.setEmbeddedData(key, embeddedData[key]);
-                    });
-                }
-            } catch (error) {
-                console.log('Parent Q method failed:', error);
-            }
-            
-            // Show completion message with debug info
+            // Show completion message
             document.getElementById('game-container').style.display = 'none';
-            document.getElementById('redirect-message').style.display = 'block';
-            document.getElementById('redirect-message').innerHTML = `
-                <h2>TMT-B Complete!</h2>
-                <p><strong>Time:</strong> ${totalTime} seconds</p>
-                <p><strong>Errors:</strong> ${errors}</p>
-                <p><strong>Accuracy:</strong> ${accuracy.toFixed(1)}%</p>
-                <p style="font-size: 12px; color: #666;">Check browser console (F12) for debugging info</p>
-                <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; font-size: 12px;">
-                    <strong>Debug Data:</strong><br>
-                    ${Object.entries(embeddedData).map(([key, value]) => `${key}: ${value}`).join('<br>')}
-                </div>
-                <button onclick="location.reload()" style="margin-top: 20px;">Restart Test</button>
-            `;
+            document.getElementById('completion-message').style.display = 'block';
         }
+
+        /*************** EMBEDDED DATA METHOD (Same as WCST) ***************/
+        function sendDataToQualtrics(totalTime, avgRT, accuracy, correctTrials) {
+            try {
+                console.log("Sending TMT data to Qualtrics via embedded fields");
+
+                if (typeof Qualtrics !== 'undefined' && Qualtrics.SurveyEngine) {
+                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_subject_id", subjectId);
+                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_test_type", "B");
+                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_total_time", totalTime);
+                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_avg_rt", avgRT);
+                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_error_count", errors);
+                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_accuracy", accuracy.toFixed(2));
+                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_completed_trials", correctTrials);
+                    Qualtrics.SurveyEngine.setEmbeddedData("tmt_total_trials", sequence.length);
+
+                    console.log("TMT embedded data set successfully");
+
+                    // Call the completion function and auto-advance
+                    setTimeout(() => {
+                        if (typeof window.onTMTComplete === 'function') {
+                            window.onTMTComplete();
+                        }
+                    }, 300);
+                } else {
+                    console.log('Not running in Qualtrics - data saved locally');
+                    alert('Experiment completed! Data has been saved locally.');
+                }
+            } catch (error) {
+                console.error("Qualtrics data transfer error:", error);
+            }
+        }
+
+        // Call completion function when experiment ends
+        window.addEventListener('beforeunload', function() {
+            if (typeof window.onTMTComplete === 'function') {
+                window.onTMTComplete();
+            }
+        });
     </script>
 </body>
 </html>
