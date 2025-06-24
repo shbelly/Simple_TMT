@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trail Making Test - Part B</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        #game-area {
+            width: 700px;
+            height: 500px;
+            background-color: white;
+            border: 2px solid #333;
+            position: relative;
+            margin: 20px auto;
+            display: none;
+        }
+        .circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #fff;
+            border: 2px solid #333;
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .circle:hover {
+            background-color: #e0e0e0;
+        }
+        .circle.completed {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .circle.current {
+            background-color: #2196F3;
+            color: white;
+            box-shadow: 0 0 10px rgba(33, 150, 243, 0.5);
+        }
+        .circle.error {
+            background-color: #f44336;
+            color: white;
+        }
+        .line {
+            position: absolute;
+            background-color: #333;
+            height: 2px;
+            transform-origin: left center;
+            z-index: -1;
+        }
+        #instructions {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        button {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        button:hover {
+            background-color: #1976D2;
+        }
+        #timer {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        #redirect-message {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Trail Making Test - Part B</h1>
+        
+        <div id="welcome">
+            <div id="instructions">
+                <h2>Instructions</h2>
+                <p><strong>Trail Making Test - Part B:</strong></p>
+                <p>Click the circles alternating between numbers and letters in order:</p>
+                <p><strong>1 → A → 2 → B → 3 → C → 4 → D → 5 → E → 6 → F</strong></p>
+                <p>Work as quickly and accurately as possible. Lines will be drawn automatically between the circles you click.</p>
+                <p>If you make an error, the circle will flash red but you can continue.</p>
+            </div>
+            <button onclick="startTest()">Start TMT-B</button>
+        </div>
+
+        <div id="game-container">
+            <div id="timer">Time: 0s</div>
+            <div id="current-target">Click: <span id="target-text">1</span></div>
+            <div id="game-area"></div>
+        </div>
+
+        <div id="redirect-message">
+            <h2>Test Complete!</h2>
+            <p>Redirecting to survey...</p>
+            <p>If you are not redirected automatically, <a href="#" id="manual-link">click here</a>.</p>
+        </div>
+    </div>
+
+    <script>
+        let sequence = [];
+        let currentIndex = 0;
+        let startTime = 0;
+        let timerInterval = null;
+        let errors = 0;
+
+        // TMT-B sequence (alternating numbers and letters)
+        const sequenceB = ['1', 'A', '2', 'B', '3', 'C', '4', 'D', '5', 'E', '6', 'F'];
+
+        function startTest() {
+            sequence = [...sequenceB];
+            currentIndex = 0;
+            errors = 0;
+            
+            document.getElementById('welcome').style.display = 'none';
+            document.getElementById('game-container').style.display = 'block';
+            document.getElementById('game-area').style.display = 'block';
+            
+            generateCircles();
+            updateTarget();
+            updateCurrentCircle();
+            startTimer();
+        }
+
+        function generateCircles() {
+            const gameArea = document.getElementById('game-area');
+            gameArea.innerHTML = '';
+            
+            const positions = generateRandomPositions(sequence.length);
+            
+            sequence.forEach((item, index) => {
+                const circle = document.createElement('div');
+                circle.className = 'circle';
+                circle.textContent = item;
+                circle.style.left = positions[index].x + 'px';
+                circle.style.top = positions[index].y + 'px';
+                circle.onclick = () => clickCircle(item, index);
+                circle.id = 'circle-' + index;
+                
+                gameArea.appendChild(circle);
+            });
+        }
+
+        function generateRandomPositions(count) {
+            const positions = [];
+            const areaWidth = 700 - 50; // Account for circle size
+            const areaHeight = 500 - 50;
+            
+            for (let i = 0; i < count; i++) {
+                let position;
+                let attempts = 0;
+                
+                do {
+                    position = {
+                        x: Math.random() * areaWidth + 25,
+                        y: Math.random() * areaHeight + 25
+                    };
+                    attempts++;
+                } while (attempts < 50 && positions.some(pos => 
+                    Math.sqrt(Math.pow(pos.x - position.x, 2) + Math.pow(pos.y - position.y, 2)) < 70
+                ));
+                
+                positions.push(position);
+            }
+            
+            return positions;
+        }
+
+        function clickCircle(item, index) {
+            const expectedItem = sequence[currentIndex];
+            const circle = document.getElementById('circle-' + index);
+            
+            if (item === expectedItem) {
+                // Correct click
+                circle.classList.add('completed');
+                
+                // Draw line from previous circle
+                if (currentIndex > 0) {
+                    drawLine(currentIndex - 1, index);
+                }
+                
+                currentIndex++;
+                
+                if (currentIndex >= sequence.length) {
+                    // Test completed
+                    completeTest();
+                } else {
+                    updateTarget();
+                    updateCurrentCircle();
+                }
+            } else {
+                // Wrong click
+                errors++;
+                circle.classList.add('error');
+                setTimeout(() => {
+                    circle.classList.remove('error');
+                }, 500);
+            }
+        }
+
+        function drawLine(fromIndex, toIndex) {
+            const fromCircle = document.getElementById('circle-' + fromIndex);
+            const toCircle = document.getElementById('circle-' + toIndex);
+            
+            const fromRect = fromCircle.getBoundingClientRect();
+            const toRect = toCircle.getBoundingClientRect();
+            const gameRect = document.getElementById('game-area').getBoundingClientRect();
+            
+            const fromX = fromRect.left - gameRect.left + 20;
+            const fromY = fromRect.top - gameRect.top + 20;
+            const toX = toRect.left - gameRect.left + 20;
+            const toY = toRect.top - gameRect.top + 20;
+            
+            const length = Math.sqrt(Math.pow(toX - fromX, 2) + Math.pow(toY - fromY, 2));
+            const angle = Math.atan2(toY - fromY, toX - fromX) * 180 / Math.PI;
+            
+            const line = document.createElement('div');
+            line.className = 'line';
+            line.style.left = fromX + 'px';
+            line.style.top = fromY + 'px';
+            line.style.width = length + 'px';
+            line.style.transform = `rotate(${angle}deg)`;
+            
+            document.getElementById('game-area').appendChild(line);
+        }
+
+        function updateTarget() {
+            document.getElementById('target-text').textContent = sequence[currentIndex];
+        }
+
+        function updateCurrentCircle() {
+            // Remove current class from all circles
+            document.querySelectorAll('.circle').forEach(c => c.classList.remove('current'));
+            
+            // Add current class to next target
+            const targetItem = sequence[currentIndex];
+            const targetIndex = sequence.findIndex((item, idx) => item === targetItem && idx >= currentIndex);
+            if (targetIndex >= 0) {
+                document.getElementById('circle-' + targetIndex).classList.add('current');
+            }
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                document.getElementById('timer').textContent = `Time: ${elapsed}s`;
+            }, 1000);
+        }
+
+        function completeTest() {
+            clearInterval(timerInterval);
+            const totalTime = Math.floor((Date.now() - startTime) / 1000);
+            
+            // Calculate performance metrics
+            const avgRT = totalTime / currentIndex;
+            const accuracy = ((currentIndex - errors) / currentIndex * 100);
+            
+            // Create embedded data for Qualtrics
+            const params = new URLSearchParams({
+                tmt_test_type: 'B',
+                tmt_total_time: totalTime,
+                tmt_avg_rt: avgRT.toFixed(2),
+                tmt_error_count: errors,
+                tmt_accuracy: accuracy.toFixed(1),
+                tmt_completed_trials: currentIndex,
+                tmt_total_trials: sequence.length
+            });
+            
+            // Your Qualtrics survey URL with embedded data
+            const qualtricsURL = 'https://oregon.qualtrics.com/jfe/form/SV_3pAnL2TwkoIaofk?' + params.toString();
+            
+            // Show redirect message
+            document.getElementById('game-container').style.display = 'none';
+            document.getElementById('redirect-message').style.display = 'block';
+            document.getElementById('manual-link').href = qualtricsURL;
+            
+            // Redirect after 2 seconds
+            setTimeout(() => {
+                window.location.href = qualtricsURL;
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
