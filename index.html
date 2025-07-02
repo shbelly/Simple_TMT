@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8"/>
-    <title>Trail Making Test - Part B</title>
+    <title>Trail Making Test - Full Experiment</title>
     
     <!-- Qualtrics Integration Script -->
     <script>
@@ -14,49 +14,35 @@
         // Function to handle experiment completion in Qualtrics
         function completeQualtricsExperiment() {
             if (isRunningInQualtrics()) {
-                // Small delay to ensure data is sent before proceeding
                 setTimeout(function() {
-                    // This will advance to the next question in Qualtrics
                     try {
                         Qualtrics.SurveyEngine.clickNextButton();
                     } catch (e) {
                         console.log('Could not automatically advance Qualtrics survey');
                     }
-                }, 1500);
+                }, 2000);
             }
         }
         
-        // Override the default completion to handle Qualtrics
         window.addEventListener('load', function() {
             if (isRunningInQualtrics()) {
                 console.log('TMT experiment loaded in Qualtrics environment');
-                
-                // Hide Qualtrics navigation buttons during experiment
                 try {
                     document.getElementById('NextButton').style.display = 'none';
                     document.getElementById('PreviousButton').style.display = 'none';
-                } catch (e) {
-                    // Buttons might not exist yet
-                }
+                } catch (e) {}
             }
         });
         
-        // Global function to be called when experiment completes
         window.onTMTComplete = function() {
             console.log('TMT experiment completed');
             if (isRunningInQualtrics()) {
-                // Show Qualtrics navigation buttons again
                 try {
                     document.getElementById('NextButton').style.display = '';
                     document.getElementById('PreviousButton').style.display = '';
-                } catch (e) {
-                    // Buttons might not exist
-                }
-                
-                // Auto-advance or show completion message
+                } catch (e) {}
                 completeQualtricsExperiment();
             } else {
-                // Not in Qualtrics, show completion message
                 alert('Experiment completed! Data has been saved.');
             }
         };
@@ -96,6 +82,7 @@
             font-weight: bold;
             cursor: pointer;
             transition: all 0.2s;
+            font-size: 14px;
         }
         .circle:hover {
             background-color: #e0e0e0;
@@ -139,10 +126,21 @@
         button:hover {
             background-color: #1976D2;
         }
-        #timer {
-            font-size: 18px;
+        #experiment-timer {
+            font-size: 24px;
             font-weight: bold;
             margin: 10px 0;
+            color: #333;
+        }
+        #trial-timer {
+            font-size: 18px;
+            margin: 5px 0;
+            color: #666;
+        }
+        #trial-info {
+            font-size: 16px;
+            margin: 10px 0;
+            color: #444;
         }
         #completion-message {
             background-color: white;
@@ -162,84 +160,225 @@
             font-size: 12px;
             z-index: 10000;
         }
+        #practice-complete {
+            background-color: #e8f5e8;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #2196F3;
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 <body>
     <div id="qualtrics-status">Running in Qualtrics</div>
     
     <script>
-        // Show Qualtrics status if running in Qualtrics
         if (typeof Qualtrics !== 'undefined') {
             document.getElementById('qualtrics-status').style.display = 'block';
         }
     </script>
 
     <div class="container">
-        <h1>Trail Making Test - Part B</h1>
+        <h1>Trail Making Test - Full Experiment</h1>
         
         <div id="welcome">
             <div id="instructions">
                 <h2>Instructions</h2>
                 <p><strong>Trail Making Test - Part B:</strong></p>
-                <p>Click the circles alternating between numbers and letters in order:</p>
-                <p><strong>1 → A → 2 → B → 3 → C → 4 → D → 5 → E → 6 → F</strong></p>
-                <p>Work as quickly and accurately as possible. Lines will be drawn automatically between the circles you click.</p>
-                <p>If you make an error, the circle will flash red but you can continue.</p>
+                <p>You will complete multiple TMT-B trials where you must:</p>
+                <p><strong>Alternate between numbers and letters in order:</strong><br>
+                1 → A → 2 → B → 3 → C → 4 → D → ...</p>
+                <p>Work as quickly and accurately as possible. The experiment will last approximately 3 minutes.</p>
+                <p>You'll start with a practice trial, then complete multiple test trials with different sequence lengths.</p>
             </div>
-            <button onclick="startTest()">Start TMT-B</button>
+            <button onclick="startExperiment()">Start Experiment</button>
         </div>
 
-        <div id="game-container">
-            <div id="timer">Time: 0s</div>
+        <div id="practice-complete">
+            <h3>Practice Complete!</h3>
+            <p>Great! Now you'll begin the main experiment.</p>
+            <button onclick="startMainExperiment()">Begin Main Experiment</button>
+        </div>
+
+        <div id="game-container" style="display: none;">
+            <div id="experiment-timer">Total Time: 0s</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div id="trial-info">
+                <div id="trial-counter">Trial: 0/0</div>
+                <div id="trial-type">Type: Practice</div>
+            </div>
+            <div id="trial-timer">Trial Time: 0s</div>
             <div id="current-target">Click: <span id="target-text">1</span></div>
             <div id="game-area"></div>
         </div>
 
         <div id="completion-message">
-            <h2>TMT-B Complete!</h2>
+            <h2>Experiment Complete!</h2>
+            <p id="final-stats"></p>
             <p>Data has been saved. Continuing to next section...</p>
         </div>
     </div>
 
     <script>
-        let sequence = [];
-        let currentIndex = 0;
-        let startTime = 0;
-        let timerInterval = null;
-        let errors = 0;
-        let allReactionTimes = [];
-        let totalTrials = 0;
+        // Experiment configuration
+        const EXPERIMENT_DURATION = 180000; // 3 minutes in milliseconds
+        const MIN_TRIAL_TIME = 8000; // Minimum 8 seconds per trial
+        const MAX_TRIAL_TIME = 25000; // Maximum 25 seconds per trial
+        
+        // TMT-B sequences only (alternating numbers and letters)
+        const TMT_B_SEQUENCES = [
+            ['1', 'A', '2', 'B', '3', 'C'],
+            ['1', 'A', '2', 'B', '3', 'C', '4', 'D'],
+            ['1', 'A', '2', 'B', '3', 'C', '4', 'D', '5', 'E'],
+            ['1', 'A', '2', 'B', '3', 'C', '4', 'D', '5', 'E', '6', 'F'],
+            ['1', 'A', '2', 'B', '3', 'C', '4', 'D', '5', 'E', '6', 'F', '7', 'G'],
+            ['1', 'A', '2', 'B', '3', 'C', '4', 'D', '5', 'E', '6', 'F', '7', 'G', '8', 'H'],
+            ['1', 'A', '2', 'B', '3'],
+            ['1', 'A', '2', 'B', '3', 'C', '4'],
+            ['1', 'A', '2', 'B', '3', 'C', '4', 'D', '5']
+        ];
 
-        // TMT-B sequence (alternating numbers and letters)
-        const sequenceB = ['1', 'A', '2', 'B', '3', 'C', '4', 'D', '5', 'E', '6', 'F'];
+        // Experiment state
+        let experimentStartTime = 0;
+        let experimentTimer = null;
+        let currentTrialType = 'A';
+        let trialCount = 0;
+        let isPractice = true;
+        let practiceCompleted = false;
+        
+        // Trial state
+        let currentSequence = [];
+        let currentIndex = 0;
+        let trialStartTime = 0;
+        let trialTimer = null;
+        let trialTimeLimit = null;
+        let errors = 0;
+        let allTrialData = [];
         
         // Generate random subject ID
-        const subjectId = 'TMT_' + Math.random().toString(36).substr(2, 9);
+        const subjectId = 'TMT_EXP_' + Math.random().toString(36).substr(2, 9);
 
-        function startTest() {
-            sequence = [...sequenceB];
-            currentIndex = 0;
-            errors = 0;
-            allReactionTimes = [];
-            totalTrials = 0;
-            
+        function startExperiment() {
             document.getElementById('welcome').style.display = 'none';
             document.getElementById('game-container').style.display = 'block';
+            
+            // Start with practice trial
+            isPractice = true;
+            trialCount = 0;
+            startPracticeTrial();
+        }
+
+        function startPracticeTrial() {
+            currentTrialType = 'B'; // Practice is TMT-B
+            currentSequence = ['1', 'A', '2', 'B', '3', 'C']; // Short practice sequence
+            
+            updateTrialInfo();
+            startTrial();
+        }
+
+        function startMainExperiment() {
+            document.getElementById('practice-complete').style.display = 'none';
+            document.getElementById('game-container').style.display = 'block';
+            
+            isPractice = false;
+            practiceCompleted = true;
+            trialCount = 0;
+            allTrialData = [];
+            
+            // Start experiment timer
+            experimentStartTime = Date.now();
+            startExperimentTimer();
+            
+            // Start first main trial
+            startNextTrial();
+        }
+
+        function startExperimentTimer() {
+            experimentTimer = setInterval(() => {
+                const elapsed = Date.now() - experimentStartTime;
+                const seconds = Math.floor(elapsed / 1000);
+                const remaining = Math.max(0, 180 - seconds);
+                
+                document.getElementById('experiment-timer').textContent = `Time Remaining: ${remaining}s`;
+                
+                // Update progress bar
+                const progress = Math.min(100, (elapsed / EXPERIMENT_DURATION) * 100);
+                document.getElementById('progress-fill').style.width = progress + '%';
+                
+                if (elapsed >= EXPERIMENT_DURATION) {
+                    completeExperiment();
+                }
+            }, 1000);
+        }
+
+        function startNextTrial() {
+            if (Date.now() - experimentStartTime >= EXPERIMENT_DURATION) {
+                completeExperiment();
+                return;
+            }
+
+            trialCount++;
+            
+            // All trials are TMT-B
+            currentTrialType = 'B';
+            
+            // Select random TMT-B sequence
+            currentSequence = [...TMT_B_SEQUENCES[Math.floor(Math.random() * TMT_B_SEQUENCES.length)]];
+            
+            updateTrialInfo();
+            startTrial();
+        }
+
+        function updateTrialInfo() {
+            if (isPractice) {
+                document.getElementById('trial-counter').textContent = 'Practice Trial';
+                document.getElementById('trial-type').textContent = 'Type: TMT-B (Practice)';
+            } else {
+                document.getElementById('trial-counter').textContent = `Trial: ${trialCount}`;
+                document.getElementById('trial-type').textContent = `Type: TMT-B`;
+            }
+        }
+
+        function startTrial() {
+            currentIndex = 0;
+            errors = 0;
+            
             document.getElementById('game-area').style.display = 'block';
             
             generateCircles();
             updateTarget();
             updateCurrentCircle();
-            startTimer();
+            startTrialTimer();
+            
+            // Set trial time limit
+            const timeLimit = MIN_TRIAL_TIME + Math.random() * (MAX_TRIAL_TIME - MIN_TRIAL_TIME);
+            trialTimeLimit = setTimeout(() => {
+                completeCurrentTrial(true); // true = timeout
+            }, timeLimit);
         }
 
         function generateCircles() {
             const gameArea = document.getElementById('game-area');
             gameArea.innerHTML = '';
             
-            const positions = generateRandomPositions(sequence.length);
+            const positions = generateRandomPositions(currentSequence.length);
             
-            sequence.forEach((item, index) => {
+            currentSequence.forEach((item, index) => {
                 const circle = document.createElement('div');
                 circle.className = 'circle';
                 circle.textContent = item;
@@ -268,7 +407,7 @@
                     };
                     attempts++;
                 } while (attempts < 50 && positions.some(pos => 
-                    Math.sqrt(Math.pow(pos.x - position.x, 2) + Math.pow(pos.y - position.y, 2)) < 70
+                    Math.sqrt(Math.pow(pos.x - position.x, 2) + Math.pow(pos.y - position.y, 2)) < 65
                 ));
                 
                 positions.push(position);
@@ -278,16 +417,8 @@
         }
 
         function clickCircle(item, index) {
-            const clickTime = Date.now();
-            const expectedItem = sequence[currentIndex];
+            const expectedItem = currentSequence[currentIndex];
             const circle = document.getElementById('circle-' + index);
-            
-            totalTrials++;
-            
-            if (currentIndex > 0) {
-                const reactionTime = clickTime - (startTime + (currentIndex - 1) * 100); // Approximate
-                allReactionTimes.push(reactionTime);
-            }
             
             if (item === expectedItem) {
                 // Correct click
@@ -300,9 +431,9 @@
                 
                 currentIndex++;
                 
-                if (currentIndex >= sequence.length) {
-                    // Test completed
-                    completeTest();
+                if (currentIndex >= currentSequence.length) {
+                    // Trial completed successfully
+                    completeCurrentTrial(false); // false = not timeout
                 } else {
                     updateTarget();
                     updateCurrentCircle();
@@ -344,103 +475,157 @@
         }
 
         function updateTarget() {
-            document.getElementById('target-text').textContent = sequence[currentIndex];
+            document.getElementById('target-text').textContent = currentSequence[currentIndex];
         }
 
         function updateCurrentCircle() {
-            // Remove current class from all circles
             document.querySelectorAll('.circle').forEach(c => c.classList.remove('current'));
             
-            // Add current class to next target
-            const targetItem = sequence[currentIndex];
-            const targetIndex = sequence.findIndex((item, idx) => item === targetItem && idx >= currentIndex);
+            const targetItem = currentSequence[currentIndex];
+            const targetIndex = currentSequence.findIndex((item, idx) => item === targetItem && idx >= currentIndex);
             if (targetIndex >= 0) {
                 document.getElementById('circle-' + targetIndex).classList.add('current');
             }
         }
 
-        function startTimer() {
-            startTime = Date.now();
-            timerInterval = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                document.getElementById('timer').textContent = `Time: ${elapsed}s`;
+        function startTrialTimer() {
+            trialStartTime = Date.now();
+            trialTimer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - trialStartTime) / 1000);
+                document.getElementById('trial-timer').textContent = `Trial Time: ${elapsed}s`;
             }, 1000);
         }
 
-        function completeTest() {
-            clearInterval(timerInterval);
-            const totalTime = Math.floor((Date.now() - startTime) / 1000);
+        function completeCurrentTrial(wasTimeout) {
+            clearInterval(trialTimer);
+            clearTimeout(trialTimeLimit);
             
-            // Calculate performance metrics
-            const correctTrials = currentIndex;
-            const accuracy = totalTrials > 0 ? ((correctTrials - errors) / totalTrials) * 100 : 0;
-            const avgRT = allReactionTimes.length > 0 ? Math.round(allReactionTimes.reduce((sum, rt) => sum + rt, 0) / allReactionTimes.length) : 0;
+            const trialTime = Date.now() - trialStartTime;
+            const completed = currentIndex >= currentSequence.length;
+            const accuracy = currentSequence.length > 0 ? ((currentIndex - errors) / currentSequence.length) * 100 : 0;
             
-            // Send data to Qualtrics using the same method as WCST
-            sendDataToQualtrics(totalTime, avgRT, accuracy, correctTrials);
+            if (!isPractice) {
+                // Store trial data
+                allTrialData.push({
+                    trial: trialCount,
+                    type: currentTrialType,
+                    sequence_length: currentSequence.length,
+                    completed: completed,
+                    timeout: wasTimeout,
+                    time_ms: trialTime,
+                    errors: errors,
+                    accuracy: parseFloat(accuracy.toFixed(2)),
+                    completed_items: currentIndex
+                });
+            }
+            
+            // Brief pause before next trial
+            setTimeout(() => {
+                if (isPractice) {
+                    // Practice trial completed
+                    document.getElementById('game-container').style.display = 'none';
+                    document.getElementById('practice-complete').style.display = 'block';
+                } else {
+                    // Continue with next trial or complete experiment
+                    if (Date.now() - experimentStartTime < EXPERIMENT_DURATION) {
+                        startNextTrial();
+                    } else {
+                        completeExperiment();
+                    }
+                }
+            }, 1000);
+        }
+
+        function completeExperiment() {
+            clearInterval(experimentTimer);
+            clearInterval(trialTimer);
+            clearTimeout(trialTimeLimit);
+            
+            const totalTime = Date.now() - experimentStartTime;
+            
+            // Calculate summary statistics
+            const totalTrials = allTrialData.length;
+            const completedTrials = allTrialData.filter(t => t.completed).length;
+            const avgTime = totalTrials > 0 ? Math.round(allTrialData.reduce((sum, t) => sum + t.time_ms, 0) / totalTrials) : 0;
+            const avgAccuracy = totalTrials > 0 ? parseFloat((allTrialData.reduce((sum, t) => sum + t.accuracy, 0) / totalTrials).toFixed(2)) : 0;
+            const totalErrors = allTrialData.reduce((sum, t) => sum + t.errors, 0);
+            
+            // All trials are TMT-B
+            const tmtBTrials = allTrialData;
+            
+            // Send comprehensive data to Qualtrics
+            sendDataToQualtrics({
+                subject_id: subjectId,
+                test_type: 'TMT-B',
+                total_experiment_time_ms: totalTime,
+                total_trials: totalTrials,
+                completed_trials: completedTrials,
+                avg_trial_time_ms: avgTime,
+                avg_accuracy: avgAccuracy,
+                total_errors: totalErrors,
+                tmt_b_trials: tmtBTrials.length,
+                tmt_b_avg_time: tmtBTrials.length > 0 ? Math.round(tmtBTrials.reduce((sum, t) => sum + t.time_ms, 0) / tmtBTrials.length) : 0,
+                tmt_b_avg_accuracy: tmtBTrials.length > 0 ? parseFloat((tmtBTrials.reduce((sum, t) => sum + t.accuracy, 0) / tmtBTrials.length).toFixed(2)) : 0,
+                fastest_trial_ms: tmtBTrials.length > 0 ? Math.min(...tmtBTrials.map(t => t.time_ms)) : 0,
+                slowest_trial_ms: tmtBTrials.length > 0 ? Math.max(...tmtBTrials.map(t => t.time_ms)) : 0
+            });
             
             // Show completion message
             document.getElementById('game-container').style.display = 'none';
+            document.getElementById('final-stats').innerHTML = `
+                <strong>Performance Summary:</strong><br>
+                Trials Completed: ${completedTrials}/${totalTrials}<br>
+                Average Accuracy: ${avgAccuracy}%<br>
+                Total Errors: ${totalErrors}<br>
+                Average Trial Time: ${Math.round(avgTime/1000)}s
+            `;
             document.getElementById('completion-message').style.display = 'block';
         }
 
-        /*************** EMBEDDED DATA METHOD - Multiple Approaches ***************/
-        function sendDataToQualtrics(totalTime, avgRT, accuracy, correctTrials) {
+        function sendDataToQualtrics(data) {
             try {
-                const tmtData = {
-                    tmt_subject_id: subjectId,
-                    tmt_test_type: "B",
-                    tmt_total_time: totalTime,
-                    tmt_avg_rt: avgRT,
-                    tmt_error_count: errors,
-                    tmt_accuracy: parseFloat(accuracy.toFixed(2)),
-                    tmt_completed_trials: correctTrials,
-                    tmt_total_trials: sequence.length
-                };
+                console.log("=== TMT EXPERIMENT DATA ===");
+                console.log("Data to send:", data);
 
-                console.log("=== TMT DATA DEBUGGING ===");
-                console.log("Data to send:", tmtData);
-                console.log("Window parent:", window.parent);
-                console.log("Self vs parent:", window.self === window.parent);
-
-                // Method 1: Direct Qualtrics API (if available)
+                // Method 1: Direct Qualtrics API
                 if (typeof Qualtrics !== 'undefined' && Qualtrics.SurveyEngine) {
                     console.log("Method 1: Direct Qualtrics API");
-                    Object.keys(tmtData).forEach(key => {
-                        Qualtrics.SurveyEngine.setEmbeddedData(key, tmtData[key]);
-                        console.log(`Set ${key}: ${tmtData[key]}`);
+                    Object.keys(data).forEach(key => {
+                        Qualtrics.SurveyEngine.setEmbeddedData(`tmt_${key}`, data[key]);
+                        console.log(`Set tmt_${key}: ${data[key]}`);
                     });
                 }
 
-                // Method 2: PostMessage to parent window
-                console.log("Method 2: PostMessage");
+                // Method 2: PostMessage to parent
                 try {
                     window.parent.postMessage({
                         type: 'SET_QUALTRICS_EMBEDDED_DATA',
-                        data: tmtData
+                        data: Object.keys(data).reduce((acc, key) => {
+                            acc[`tmt_${key}`] = data[key];
+                            return acc;
+                        }, {})
                     }, '*');
                     console.log("PostMessage sent to parent");
                 } catch (e) {
                     console.log("PostMessage failed:", e);
                 }
 
-                // Method 3: Try to access parent Qualtrics
+                // Method 3: Parent Qualtrics access
                 try {
-                    if (window.parent && window.parent.Qualtrics && window.parent.Qualtrics.SurveyEngine) {
+                    if (window.parent?.Qualtrics?.SurveyEngine) {
                         console.log("Method 3: Parent Qualtrics API");
-                        Object.keys(tmtData).forEach(key => {
-                            window.parent.Qualtrics.SurveyEngine.setEmbeddedData(key, tmtData[key]);
-                            console.log(`Parent set ${key}: ${tmtData[key]}`);
+                        Object.keys(data).forEach(key => {
+                            window.parent.Qualtrics.SurveyEngine.setEmbeddedData(`tmt_${key}`, data[key]);
                         });
                     }
                 } catch (e) {
                     console.log("Parent Qualtrics access failed:", e);
                 }
 
-                // Method 4: Store in window for Qualtrics to pick up
+                // Method 4: Store in window
                 try {
-                    window.tmtResults = tmtData;
-                    window.parent.tmtResults = tmtData;
+                    window.tmtExperimentResults = data;
+                    window.parent.tmtExperimentResults = data;
                     console.log("Method 4: Stored in window objects");
                 } catch (e) {
                     console.log("Window storage failed:", e);
@@ -448,19 +633,18 @@
 
                 console.log("=== ALL METHODS ATTEMPTED ===");
 
-                // Auto-advance
                 setTimeout(() => {
                     if (typeof window.onTMTComplete === 'function') {
                         window.onTMTComplete();
                     }
-                }, 500);
+                }, 1000);
 
             } catch (error) {
                 console.error("Qualtrics data transfer error:", error);
             }
         }
 
-        // Call completion function when experiment ends
+        // Cleanup on page unload
         window.addEventListener('beforeunload', function() {
             if (typeof window.onTMTComplete === 'function') {
                 window.onTMTComplete();
