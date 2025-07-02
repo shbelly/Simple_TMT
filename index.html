@@ -554,6 +554,10 @@
             const tmtBTrials = allTrialData;
             
             // Send comprehensive data to Qualtrics
+            const tmtBTrialCount = allTrialData.length;
+            const tmtBAvgAccuracy = tmtBTrialCount > 0 ? 
+                parseFloat((allTrialData.reduce((sum, t) => sum + t.accuracy, 0) / tmtBTrialCount).toFixed(2)) : 0;
+            
             sendDataToQualtrics({
                 subject_id: subjectId,
                 test_type: 'TMT-B',
@@ -563,11 +567,11 @@
                 avg_trial_time_ms: avgTime,
                 avg_accuracy: avgAccuracy,
                 total_errors: totalErrors,
-                tmt_b_trials: tmtBTrials.length,
-                tmt_b_avg_time: tmtBTrials.length > 0 ? Math.round(tmtBTrials.reduce((sum, t) => sum + t.time_ms, 0) / tmtBTrials.length) : 0,
-                tmt_b_avg_accuracy: tmtBTrials.length > 0 ? parseFloat((tmtBTrials.reduce((sum, t) => sum + t.accuracy, 0) / tmtBTrials.length).toFixed(2)) : 0,
-                fastest_trial_ms: tmtBTrials.length > 0 ? Math.min(...tmtBTrials.map(t => t.time_ms)) : 0,
-                slowest_trial_ms: tmtBTrials.length > 0 ? Math.max(...tmtBTrials.map(t => t.time_ms)) : 0
+                b_trials: tmtBTrialCount,
+                b_avg_time: tmtBTrialCount > 0 ? Math.round(allTrialData.reduce((sum, t) => sum + t.time_ms, 0) / tmtBTrialCount) : 0,
+                b_avg_accuracy: tmtBAvgAccuracy,
+                fastest_trial_ms: tmtBTrialCount > 0 ? Math.min(...allTrialData.map(t => t.time_ms)) : 0,
+                slowest_trial_ms: tmtBTrialCount > 0 ? Math.max(...allTrialData.map(t => t.time_ms)) : 0
             });
             
             // Show completion message
