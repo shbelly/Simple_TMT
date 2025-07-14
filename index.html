@@ -27,20 +27,76 @@
         window.addEventListener('load', function() {
             if (isRunningInQualtrics()) {
                 console.log('TMT experiment loaded in Qualtrics environment');
-                try {
-                    document.getElementById('NextButton').style.display = 'none';
-                    document.getElementById('PreviousButton').style.display = 'none';
-                } catch (e) {}
+                hideQualtricsButtons();
             }
         });
+        
+        // Function to hide Qualtrics navigation buttons
+        function hideQualtricsButtons() {
+            try {
+                // Hide Next button
+                const nextButton = document.getElementById('NextButton');
+                if (nextButton) {
+                    nextButton.style.display = 'none';
+                    nextButton.style.visibility = 'hidden';
+                }
+                
+                // Hide Previous button  
+                const prevButton = document.getElementById('PreviousButton');
+                if (prevButton) {
+                    prevButton.style.display = 'none';
+                    prevButton.style.visibility = 'hidden';
+                }
+                
+                // Also try jQuery selectors in case Qualtrics uses those
+                if (typeof $ !== 'undefined') {
+                    $('#NextButton').hide();
+                    $('#PreviousButton').hide();
+                    $('input[type="submit"][value="Next"]').hide();
+                    $('input[value=">>"]').hide();
+                }
+                
+                console.log('Qualtrics buttons hidden');
+            } catch (e) {
+                console.log('Error hiding buttons:', e);
+            }
+        }
+        
+        // Function to show Qualtrics navigation buttons
+        function showQualtricsButtons() {
+            try {
+                // Show Next button
+                const nextButton = document.getElementById('NextButton');
+                if (nextButton) {
+                    nextButton.style.display = '';
+                    nextButton.style.visibility = 'visible';
+                }
+                
+                // Show Previous button
+                const prevButton = document.getElementById('PreviousButton');
+                if (prevButton) {
+                    prevButton.style.display = '';
+                    prevButton.style.visibility = 'visible';
+                }
+                
+                // Also try jQuery selectors
+                if (typeof $ !== 'undefined') {
+                    $('#NextButton').show();
+                    $('#PreviousButton').show();
+                    $('input[type="submit"][value="Next"]').show();
+                    $('input[value=">>"]').show();
+                }
+                
+                console.log('Qualtrics buttons shown');
+            } catch (e) {
+                console.log('Error showing buttons:', e);
+            }
+        }
         
         window.onTMTComplete = function() {
             console.log('TMT experiment completed');
             if (isRunningInQualtrics()) {
-                try {
-                    document.getElementById('NextButton').style.display = '';
-                    document.getElementById('PreviousButton').style.display = '';
-                } catch (e) {}
+                showQualtricsButtons();
                 completeQualtricsExperiment();
             } else {
                 alert('Experiment completed! Data has been saved.');
@@ -634,6 +690,9 @@
                 window.onTMTComplete();
             }
         });
+    </script>
+</body>
+</html>
     </script>
 </body>
 </html>
