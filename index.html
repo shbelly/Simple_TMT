@@ -610,6 +610,14 @@
                 slowest_trial_ms: tmtBTrialCount > 0 ? Math.max(...allTrialData.map(t => t.time_ms)) : 0
             });
             
+            // Send completion signal to parent (Qualtrics) - separate from data transfer
+            try {
+                window.parent.postMessage({type: 'TMT_COMPLETE'}, '*');
+                console.log("TMT_COMPLETE message sent to parent");
+            } catch (e) {
+                console.log("Failed to send completion message:", e);
+            }
+            
             // Show completion message
             document.getElementById('game-container').style.display = 'none';
             document.getElementById('final-stats').innerHTML = `
@@ -690,9 +698,6 @@
                 window.onTMTComplete();
             }
         });
-    </script>
-</body>
-</html>
     </script>
 </body>
 </html>
