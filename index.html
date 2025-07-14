@@ -223,7 +223,6 @@
                 <div id="trial-type">Type: Practice</div>
             </div>
             <div id="trial-timer">Trial Time: 0s</div>
-            <div id="current-target">Click: <span id="target-text">1</span></div>
             <div id="game-area"></div>
         </div>
 
@@ -361,8 +360,6 @@
             document.getElementById('game-area').style.display = 'block';
             
             generateCircles();
-            updateTarget();
-            updateCurrentCircle();
             startTrialTimer();
             
             // Set trial time limit
@@ -434,9 +431,6 @@
                 if (currentIndex >= currentSequence.length) {
                     // Trial completed successfully
                     completeCurrentTrial(false); // false = not timeout
-                } else {
-                    updateTarget();
-                    updateCurrentCircle();
                 }
             } else {
                 // Wrong click
@@ -472,20 +466,6 @@
             line.style.transform = `rotate(${angle}deg)`;
             
             document.getElementById('game-area').appendChild(line);
-        }
-
-        function updateTarget() {
-            document.getElementById('target-text').textContent = currentSequence[currentIndex];
-        }
-
-        function updateCurrentCircle() {
-            document.querySelectorAll('.circle').forEach(c => c.classList.remove('current'));
-            
-            const targetItem = currentSequence[currentIndex];
-            const targetIndex = currentSequence.findIndex((item, idx) => item === targetItem && idx >= currentIndex);
-            if (targetIndex >= 0) {
-                document.getElementById('circle-' + targetIndex).classList.add('current');
-            }
         }
 
         function startTrialTimer() {
